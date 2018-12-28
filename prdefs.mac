@@ -1,0 +1,13 @@
+; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
+
+; Project definitions
+        .Radix 8
+
+        BPSB   =: 8000.  ;bit plane size, bytes
+        FBSW   =: 8000.  ;frame buffer(320x200) size, words
+        BP0    =: 4096.  ;address of bit plane 0
+        BP12   =: BP0*2  ;address of bit blanes 1/2
+        LSW    =: 40.    ;line size, words (320*2/16)
+        STCKSZ =: 128.   ;stack size, words
+        BMPSZ  =: 9600.  ;320x240
+

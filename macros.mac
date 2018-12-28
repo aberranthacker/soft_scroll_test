@@ -1,0 +1,24 @@
+; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
+;
+
+.MACRO MOVT Count,Src,Dst
+    .REPT Count
+        MOV Src,Dst
+    .ENDR
+.ENDM
+
+.MACRO PUSH RG0,RG1,RG2,RG3,RG4,RG5
+    .IRP REG,<RG0,RG1,RG2,RG3,RG4,RG5>
+        .IF NB REG                      ;if argument not blank
+            MOV REG,-(SP)               ;then add command to push arg to stack
+        .ENDC
+    .ENDR
+.ENDM
+
+.MACRO POP RG0,RG1,RG2,RG3,RG4,RG5
+    .IRP REG,<RG0,RG1,RG2,RG3,RG4,RG5>
+        .IF NB REG                      ;if argument not blank
+            MOV (SP)+,REG               ;then add command to pop arg from stack
+        .ENDC
+    .ENDR
+.ENDM

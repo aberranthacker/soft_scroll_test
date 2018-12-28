@@ -1,0 +1,383 @@
+; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
+                .Title  SoftScroll
+                .Ident  /V0.01/
+
+                ;if you'd like the programm to use extended memory, located
+                ;above 160000 define one of the two symbols below
+                SRAM   = 1 ;places screen scroll subroutines above 170000
+                ;PCSRAM = 1 ;use window above 160000 for picture buffer and
+                           ;window above 170000 for screen scroll subroutines
+
+                .Include /HWDEFS.MAC/ ; Hardware registers and some other definitions
+                .Include /PRDEFS.MAC/ ; Project symbols definitions
+                .Include /MACROS.MAC/ ; Macros
+                .IIF DF SRAM,   .Include /SRAM.MM/
+                .IIF DF PCSRAM, .Include /PCSRAM.MM/
+
+                .MCall  .Print, .Lookup, .ReadW, .Close, .Exit
+
+                .ASect
+                .=42    ;address of initial stack pointer
+            .IF DF SRAM ! PCSRAM
+                .WORD   175776
+            .IFF
+                .WORD  STCKTP + <STCKSZ * 2>
+            .ENDC
+
+                .=1000
+Start:          ;------------------------------------------------------------{{{
+                ;CALL    FillVP                  ;file viewport area with a pattern
+                CALL    RdPict                  ;load a picture from file
+
+            .IF DF SRAM
+                CALL    RdSRAM                  ;install subroutines to SRAM
+            .ENDC
+            .IF DF PCSRAM
+                CALL    RdPCSR
+                CALL    CPPICT                  ;copy picture to SRAM
+            .ENDC
+
+                .Print  #KeyOFF
+                CLR     #FlgEnd                 ;clear "PPUs program finished" flag
+                JSR     R5,PPEXEC               ;load and execute code block by PPU
+                .WORD   PPUTBeg                 ;address of the block
+                .WORD   <PPUTEnd-PPUTBeg>/2     ;PPU subroutine size, words
+
+                CALL    FillHF                  ;fill header/footer with a pattern
+            .IF NDF PCSRAM
+                CALL    FillLPs                 ;create screenlines lookup table
+                MOV     #LinePs+<200.*2>,R3     ;last line copy from
+                MOV     #LinePs+<240.*2>,R4     ;first line copy to
+            .ENDC
+
+                MOV     @#100,@#SysHand         ;store address of systems timer handler
+                MOV     #TimerSr,@#100
+
+                CLR     R5                      ;
+WaitPP:         CALL    ShiftVP
+                INC     R5
+                TST     FlgEnd
+                BEQ     WaitPP                  ;Wait until PPUs program finishes
+
+                JSR     R5,PPFREE
+PPUMBeg::       .BLKW                           ;address of allocated block
+                .WORD   <PPUTEnd-PPUTBeg>/2     ;PPU subroutine size, words
+Finish:
+                MOV     @#SysHand,@#100         ;restore systems timer handler
+
+                MOV     #<RsltStr+21.>,R1
+                MOV     @#Result,R3
+                CALL    InsDecStr
+
+                .Print  #RsltStr
+                .Print  #KeyON
+                .Exit
+
+SysHand:        .Word
+FlgEnd::        .Word   0 ;end program flag
+KeyOFF:         .ASCII  <33><133><62><150><200>
+KeyON:          .ASCII  <33><133><62><154><200>
+                        ;0         1         2         3         4         5         6         7
+                        ;01234567890123456789012345678901234567890123456789012345678901234567890123456789
+RsltStr:        .ASCIZ  "Result, timer ticks: 123456"
+                .Even
+;----------------------------------------------------------------------------}}}
+TimerSr:        ;our timer soubroutine -------------------------------------{{{
+                CMP     R5,#200.
+                BNE     1$
+                MOV     @#TCounter, @#Result       
+                CLR     R5
+                CLR     @#TCounter
+                RTI
+1$:             INC     @#TCounter
+                RTI
+
+TCounter:       .Word   0 ; Timer counter
+Result:         .Word   0
+;----------------------------------------------------------------------------}}}
+ClrHF:          ;------------------------------------------------------------{{{
+                MOV     #<88.*LSW>,R0   ;word to clear
+                MOV     #100000,@#CBPADR;address of first word on first line
+                CLR     R1
+1$:             MOV     R1,@#CBP12D     ;clear byte
+                INC     @#CBPADR        ;switch to next word
+                SOB     R0,1$
+                RETURN
+;----------------------------------------------------------------------------}}}
+FillHF:         ;------------------------------------------------------------{{{
+                MOV     #88.,R0         ;lines to fill
+                MOV     #100000,@#CBPADR;address of the first line
+                MOV     #^X00AA,R2      ;pattern
+1$:             MOV     #LSW,R1
+                COMB    R2              ;invert pattern
+2$:             MOV     R2,@#CBP12D
+                INC     @#CBPADR        ;switch to next word
+                SOB     R1,2$
+                SOB     R0,1$
+                RETURN
+;----------------------------------------------------------------------------}}}
+ClrVP:          ;------------------------------------------------------------{{{
+                MOV     #FBSW,R0
+                MOV     #BP12,R1
+1$:             CLR     (R1)+
+                SOB     R0,1$
+                RETURN
+;----------------------------------------------------------------------------}}}
+FillVP:         ;------------------------------------------------------------{{{
+                MOV     #BP12,R1
+
+                MOV     #LSW,R0
+                MOV     #^X0FFFF,R2     ;the first line is white
+1$:             MOV     R2,(R1)+
+                SOB     R0, 1$
+
+                MOV     #^X0FF00,R2
+                MOV     #198.,R3        ;number of lines
+2$:             COM     R2
+                MOV     #LSW,R0
+3$:             MOV     R2,(R1)+
+                SOB     R0,3$
+                SOB     R3,2$
+
+                MOV     #LSW,R0
+                MOV     #^X0FFFF,R2     ;and the last line is white as well
+4$:             MOV     R2,(R1)+
+                SOB     R0, 4$
+
+                RETURN
+;----------------------------------------------------------------------------}}}
+RdPict::        ;------------------------------------------------------------{{{
+                .LOOKUP #LkpArea,#0,#REBELS      ;.LOOKUP area,chan,dblk[,seqnum]
+                BCS     1$
+                .READW  #RdArea,#0,#FB,#BMPSZ,#0 ;.READW  area,chan,buf,wcnt,blk[,BMODE=strg]
+                BCS     2$
+                .Close  #0                       ;.CLOSE  chan
+                RETURN
+
+1$:             .Print  #LErr
+                .Exit
+2$:             .Print  #RErr
+                .Exit
+
+REBELS:         .RAD50  /DK REBELSBPS/
+;----------------------------------------------------------------------------}}}
+PPUTBeg:        ;------------------------------------------------------------{{{
+; screen scanlines metadata: ------------------------------------------------{{{
+; | 2400 | 175700—176567 | верхняя служебная строка           |
+; | 2470 | 100000—154537 | основной (главный) экран           |
+; | 4700 | 154540—175677 | экран установок (по клавише «УСТ») |
+; | 6750 | 176570—177457 | нижняя служебная строка            |
+; |      | 177460—177777 | для внутреннего использования      |
+; 309 lines in total (lines 4..312 of SECAM's half-frame)
+; scanlines 1..19 are not visible due to the vertical blanking interval
+; scanlines 20..307 are visible
+; scanlines 308..309 are not visible due to the vertical blanking interval
+                MOV     PC,R0           ;
+                ADD     #SLTAB-.,R0     ;calc address of current element of SLTAB
+                ADD     #7,R0           ;
+                BIC     #7,R0           ;align at 8 bytes
+                MOV     R0,R1           ;R0 address of current element (2)
+                ADD     #4,R1           ;R1 address of next element (3)
+
+                MOV     #15.,R2         ;elements 2..16 are same
+1$:             CLR     (R0)+           ;--addresses of lines 2..16
+                MOV     R1,(R0)+        ;--pointers to elements 3..17
+                ADD     #4,R1           ;calc address of next element of SLTAB
+                SOB     R2,1$
+
+                CLR     (R0)+           ;--address of line 17
+                BIS     #^B010,R1       ;  next element is 4 words
+                BIC     #^B100,R1       ;  display settings
+                MOV     R1,(R0)+        ;--pointer to an element 18
+
+                MOV     #^B10000,(R0)+  ;--cursor settings, graphical cursor
+                MOV     #^B010111,(R0)+ ;  320 dots per line, pallete 7
+                CLR     (R0)+           ;  address of line 18
+                ADD     #8.,R1          ;  calculate pointer to next element
+                BIS     #^B110,R1       ;  next element is 4 words, color settings
+                MOV     R1,(R0)+        ;--pointer to element 19
+                                        ;--color settings YRGB YRGB YRGB YRGB
+                MOV     #^X02200,(R0)+  ;colors  011  010  001  000
+                MOV     #^X0AAFF,(R0)+  ;colors  111  110  101  100
+                CLR     (R0)+           ;  address of line 19
+                ADD     #8.,R1          ;  calculate pointer to next element
+                BIC     #^B110,R1       ;  next element consists of 2 words
+                MOV     R1,(R0)+        ;--pointer to element 20
+;----------------------------------------scanlines 20..307 are visible
+                MOV     #100000,R2      ;
+                MOV     #44.,R3         ;
+2$:             MOV     R2,(R0)+        ;--VRAM address of a scanline
+                ADD     #4,R1           ;calc address of next element SLTAB
+                MOV     R1,(R0)+        ;--pointer to the next element SLTAB
+                ADD     #40.,R2         ;calculate VRAM address of next scanline
+                SOB     R3,2$           ;
+                                        ;
+                MOV     #BP0,R2         ;address of bitplane 0
+                MOV     #200.,R3        ;height of main RAM located framebuffer
+3$:             MOV     R2,(R0)+        ;--main RAM address of a scanline
+                ADD     #4,R1           ;calc address of next element of SLTAB
+                MOV     R1,(R0)+        ;--pointer to the next element of SLTAB
+                ADD     #40.,R2         ;calculate VRAM address of next scanline
+                SOB     R3,3$           ;
+                                        ;
+                MOV     #103340,R2      ;
+                MOV     #44.,R3         ;
+4$:             MOV     R2,(R0)+        ;--VRAM address of a scanline
+                ADD     #4,R1           ;calc address of next element of SLTAB
+                MOV     R1,(R0)+        ;--pointer to the next element of SLTAB
+                ADD     #40.,R2         ;calculate VRAM address of next scanline
+                SOB     R3,4$           ;
+                                        ;
+                CLR     (R0)+           ;--address of line 308
+                MOV     R1,(R0)         ;--pointer back to element 308
+;----------------------------------------------------------------------------}}}
+                MTPS    PR7             ;disable interrupts
+                MOV     #1,@#PBPMSK     ;disable writes to bitplane 0 through registers
+                MOV     PC,R0           ;store pointer to the next element of
+                ADD     #SYS272-.,R0    ;scanlines table
+                MOV     @#272,(R0)      ;
+
+                MOV     PC,R0           ;address of current element in SLTAB
+                ADD     #SLTAB-.,R0     ;first element
+                ADD     #7,R0           ;align at 8 bytes, otherwise
+                BIC     #7,R0           ;for some reason, the new table will not work
+                MOV     R0,@#272        ;--pointer to element 1 in SLTAB
+
+WaitKey:        TSTB    @#KBSTAT        ;wait for any key state to change
+                BPL     WaitKey         ;branch if plus
+
+                TSTB    @#KBDATA        ;loop if a key was pressed off
+                BMI     WaitKey         ;branch if minus
+                                        ;--- finish PPU program ---
+                MOV     PC,R0           ;restore pointer to systems
+                ADD     #SYS272-.,R0    ;scanlines table
+                MOV     (R0),@#272      ;
+                CLR     @#PBPMSK        ;enable writes to all bitplanes through registers
+
+                MOV     #<FlgEnd/2>,@#PBPADR
+                MOV     #-1,@#PBP12D   ;signal that PPUs program finished
+                RETURN
+
+SYS272:         .WORD           ;pointer to systems scanlines table
+SLTAB:          .BLKW   600.    ;our scanlines table
+PPUTEnd:
+;----------------------------------------------------------------------------}}}
+
+            .IF DF SRAM
+RdSRAM:         ;------------------------------------------------------------{{{
+                .LOOKUP #LkpArea,#0,#SRABIN      ;.LOOKUP area,chan,dblk[,seqnum]
+                BCS     1$
+                .READW  #RdArea,#0,#170000,#SRAMSZ,#0 ;.READW  area,chan,buf,wcnt,blk[,BMODE=strg]
+                BCS     2$
+                .Close  #0                       ;.CLOSE  chan
+                RETURN
+
+1$:             .Print  #LErr
+                .Exit
+2$:             .Print  #RErr
+                .Exit
+
+SRABIN:         .RAD50  /DK SRAM  BIN/
+;----------------------------------------------------------------------------}}}
+            .ENDC
+
+            .IF DF PCSRAM
+RdPCSR:         ;------------------------------------------------------------{{{
+                .LOOKUP #LkpArea,#0,#PCSBIN      ;.LOOKUP area,chan,dblk[,seqnum]
+                BCS     1$
+                .READW  #RdArea,#0,#170000,#PCSRSZ,#0 ;.READW  area,chan,buf,wcnt,blk[,BMODE=strg]
+                BCS     2$
+                .Close  #0                       ;.CLOSE  chan
+                RETURN
+
+1$:             .Print  #LErr
+                .Exit
+2$:             .Print  #RErr
+                .Exit
+
+PCSBIN:         .RAD50  /DK PCSRAMBIN/
+;----------------------------------------------------------------------------}}}
+CPPICT:         ;------------------------------------------------------------{{{
+                CLRB    @#WNDRGA                ;switch to page 0
+                MOV     #BP12,R3
+                MOV     #160000,R4
+                MOV     #2000.,R0               ;number of words per page
+                MOV     #<BMPSZ/2000.>,R1       ;number of pages
+
+1$:             MOV     (R3)+,(R4)+
+                SOB     R0,1$
+
+                INCB    @#WNDRGA                ;next page
+                MOV     #160000,R4
+                MOV     #2000.,R0               ;number of words per page
+                SOB     R1,1$
+
+                MOV     #<BMPSZ-<BMPSZ/2000.*2000.>>,R0 ; the remainder of words to copy
+
+2$:             MOV     (R3)+,(R4)+
+                SOB     R0,2$
+
+                RETURN
+;----------------------------------------------------------------------------}}}
+            .ENDC
+
+            .IF NDF SRAM & PCSRAM
+ShiftVP:        ;------------------------------------------------------------{{{
+                MOV     (R4)+,R1
+                MOV     #BP12,R2
+                CALL    CpLine          ;at the end, R2 points to the second line
+
+                MOV     #BP12,R1
+                MOV     #199.,R0
+1$:             CALL    CpLine
+                SOB     R0,1$
+
+                MOV     (R3)+,R2
+                CALL    CpLine
+
+                CMP     #LinePs+<241.*2>,R4
+                BNE     2$
+                MOV     #LinePs+<200.*2>,R4
+2$:
+                CMP     #LinePs+<241.*2>,R3
+                BNE     3$
+                MOV     #LinePs+<200.*2>,R3
+3$:
+                RETURN
+;----------------------------------------------------------------------------}}}
+CpLine:         ;------------------------------------------------------------{{{
+                MOVT    40.,(R2)+,(R1)+ ; MOV (R2)+,(R1)+ 40 times
+                RETURN
+;----------------------------------------------------------------------------}}}
+FillLPs:        ;------------------------------------------------------------{{{
+                MOV     #241.,R0
+                MOV     #BP12,R1
+                MOV     #LinePs,R2
+1$:             MOV     R1,(R2)+
+                ADD     #<LSW*2>,R1
+                SOB     R0,1$
+                RETURN
+;----------------------------------------------------------------------------}}}
+            .ENDC
+
+LkpArea:        .BYTE 0,1  ;chan, code(.LOOKUP)
+                .BLKW      ;dblk
+RdArea:         .BYTE 0,10 ;chan, code(.READ/.READC/.READW)
+                .BLKW 4    ;blk, buf, wcnt, end of area(.READW=0,.READ=1)
+LErr:           .ASCIZ  /File lookup error./
+RErr:           .ASCIZ  /File read error./
+                .Even
+
+            .IF NDF SRAM & PCSRAM
+LinePs::        .BLKW   241.
+            .ENDC
+
+                .Include /PPUCMD.MAC/
+EOPRG::         ;end of the program section
+
+                .ASect
+                .=BP12
+FB::            .BLKW   BMPSZ           ;framebuffer 320x240
+                .BLKW   LSW             ;extra line
+STCKTP::        .BLKW   STCKSZ
+                .End    Start

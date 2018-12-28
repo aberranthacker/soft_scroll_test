@@ -1,0 +1,31 @@
+; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
+
+                .Include /HWDEFS.MAC/ ; Hardware registers definitions
+                .Include /PRDEFS.MAC/ ; Project symbols definitions
+                .Include /MACROS.MAC/ ; Macros
+
+                .ASect
+                .=170000
+
+START:
+ShiftVP::       ;------------------------------------------------------------{{{
+                MOV     #160000,R3
+                MOV     #BP12,R4
+                CLRB    @#WNDRGA
+                MOV     #4,R0
+
+1$:             MOV     #<2000./LSW>,R1
+
+2$:             CALL    CpLine
+                SOB     R1,2$
+
+                INCB    @#WNDRGA
+                MOV     #160000,R3
+                SOB     R0,1$
+
+                RETURN
+;----------------------------------------------------------------------------}}}
+
+SRAMEND:
+                PCSRSZ ==: SRAMEND-START
+                .End Start

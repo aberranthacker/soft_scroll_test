@@ -1,0 +1,11 @@
+*.OBJ
+*.MAP
+*.MM
+*.BIN
+*.LDA
+*.SAV
+*.til
+STARTS.COM
+
+default.vim
+default.vim.lock

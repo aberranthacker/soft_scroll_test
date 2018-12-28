@@ -1,0 +1,52 @@
+; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
+
+                .Include /HWDEFS.MAC/ ; Hardware registers definitions
+                .Include /PRDEFS.MAC/ ; Project symbols definitions
+                .Include /MACROS.MAC/ ; Macros
+
+                .ASect
+                .=170000
+
+START:
+FillLPs::       ;------------------------------------------------------------{{{
+                MOV     #241.,R0
+                MOV     #BP12,R1
+                MOV     #LinePs,R2
+1$:             MOV     R1,(R2)+
+                ADD     #<LSW*2>,R1
+                SOB     R0,1$
+                RETURN
+;----------------------------------------------------------------------------}}}
+ShiftVP::       ;------------------------------------------------------------{{{
+                MOV     (R4)+,R1
+                MOV     #BP12,R2
+                CALL    CpLine          ;at the end, R2 points to second line
+
+                MOV     #BP12,R1
+                MOV     #199.,R0
+1$:             CALL    CpLine
+                SOB     R0,1$
+
+                MOV     (R3)+,R2
+                CALL    CpLine
+
+                CMP     #LinePs+<241.*2>,R4
+                BNE     2$
+                MOV     #LinePs+<200.*2>,R4
+2$:
+                CMP     #LinePs+<241.*2>,R3
+                BNE     3$
+                MOV     #LinePs+<200.*2>,R3
+3$:
+                RETURN
+;----------------------------------------------------------------------------}}}
+CpLine:         ;------------------------------------------------------------{{{
+                MOVT    40.,(R2)+,(R1)+ ; MOV (R2)+,(R1)+ 40 times
+                RETURN
+;----------------------------------------------------------------------------}}}
+
+LinePs::        .BLKW   241.
+
+SRAMEND:
+                SRAMSZ ==: SRAMEND-START
+                .End Start
