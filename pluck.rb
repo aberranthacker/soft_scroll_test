@@ -1,4 +1,3 @@
-require 'pry'
 require 'optparse'
 
 options = Struct.new(:in_filename, :out_filename, :map_filename).new

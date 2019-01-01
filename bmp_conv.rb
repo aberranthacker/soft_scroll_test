@@ -1,5 +1,3 @@
-require 'pry'
-
 # https://github.com/bordeeinc/bmp-ruby
 bmp = File.binread('rebels.bmp')
 

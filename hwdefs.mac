@@ -45,6 +45,6 @@ KBSTAT =: 177700 ;keyboard state register
 KBDATA =: 177702 ;keyboard data register
 
 ; SRAM module register
-WNDRGS =: 176000
-WNDRGA =: 176000 ; window a
-WNDRGB =: 176001 ; window b
+WNDRGS =: 176000 ; windows registers
+WNDRGA =: 176000 ; window register a
+WNDRGB =: 176001 ; window register b
