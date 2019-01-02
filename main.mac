@@ -26,14 +26,14 @@
 
                 .=1000
 Start:          ;------------------------------------------------------------{{{
-                ;CALL    FillVP                  ;file viewport area with a pattern
+                ;CALL    FillVP                  ;fill viewport area with a pattern
                 CALL    RdPict                  ;load a picture from file
 
             .IF DF SRAM
                 CALL    RdSRAM                  ;install subroutines to SRAM
             .ENDC
             .IF DF PCSRAM
-                CALL    RdPCSR
+                CALL    RdPCSR                  ;install subroutines to SRAM
                 CALL    CPPICT                  ;copy picture to SRAM
             .ENDC
 
@@ -46,12 +46,12 @@ Start:          ;------------------------------------------------------------{{{
                 CALL    FillHF                  ;fill header/footer with a pattern
             .IF NDF PCSRAM
                 CALL    FillLPs                 ;create screenlines lookup table
-                MOV     #LinePs+<200.*2>,R3     ;last line copy from
-                MOV     #LinePs+<240.*2>,R4     ;first line copy to
+                MOV     #LinePs+<200.*2>,R3     ;last line to copy from
+                MOV     #LinePs+<240.*2>,R4     ;first line to copy to
             .ENDC
 
                 MOV     @#100,@#SysHand         ;store address of systems timer handler
-                MOV     #TimerSr,@#100
+                MOV     #TimerSr,@#100          ;and install our handler
 
                 CLR     R5                      ;
 WaitPP:         CALL    ShiftVP
@@ -61,7 +61,7 @@ WaitPP:         CALL    ShiftVP
 
                 JSR     R5,PPFREE
 PPUMBeg::       .BLKW                           ;address of allocated block
-                .WORD   <PPUTEnd-PPUTBeg>/2     ;PPU subroutine size, words
+                .WORD   <PPUTEnd-PPUTBeg>/2     ;PPUs subroutine size, words
 Finish:
                 MOV     @#SysHand,@#100         ;restore systems timer handler
 
@@ -82,10 +82,10 @@ KeyON:          .ASCII  <33><133><62><154><200>
 RsltStr:        .ASCIZ  "Result, timer ticks: 123456"
                 .Even
 ;----------------------------------------------------------------------------}}}
-TimerSr:        ;our timer soubroutine -------------------------------------{{{
+TimerSr:        ;our timer soubroutine --------------------------------------{{{
                 CMP     R5,#200.
                 BNE     1$
-                MOV     @#TCounter, @#Result       
+                MOV     @#TCounter, @#Result
                 CLR     R5
                 CLR     @#TCounter
                 RTI

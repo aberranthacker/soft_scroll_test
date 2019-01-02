@@ -111,8 +111,9 @@ InsDecStr:      ;------------------------------------------------------------{{{
                           ;R3 - number (second argument)
         ADD R0,R1
 1$:     CLR R2            ;R2 - most, R3 - least significant word
-            DIV  #10.,R2   ;R2 - quotient, R3 - remainder
-            ADD  #'0,R3   ;add ASCII code for "0" to remainder
+            DIV  #10.,R2
+                          ;R2 contains quotient, R3 - remainder
+            ADD  #'0,R3   ;add ASCII code for "0" to the remainder
             MOVB R3,-(R1)
             MOV  R2,R3
         SOB R0,1$
