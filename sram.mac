@@ -18,17 +18,17 @@ FillLPs::       ;------------------------------------------------------------{{{
                 RETURN
 ;----------------------------------------------------------------------------}}}
 ShiftVP::       ;------------------------------------------------------------{{{
-                MOV     (R4)+,R1
-                MOV     #BP12,R2
-                CALL    CpLine          ;at the end, R2 points to second line
-
-                MOV     #BP12,R1
-                MOV     #199.,R0
-1$:             CALL    CpLine
+                MOV     (R4)+,R1        ;R1 - destination
+                MOV     #BP12,R2        ;R2 - source
+                CALL    CpLine          ;copy the first line to the offscreen buffer
+                                        ;at the end, R2 points to the second line
+                MOV     #BP12,R1        ;
+                MOV     #199.,R0        ;
+1$:             CALL    CpLine          ;shift 199 screen lines up
                 SOB     R0,1$
 
-                MOV     (R3)+,R2
-                CALL    CpLine
+                MOV     (R3)+,R2        ;
+                CALL    CpLine          ;and copy the last line from the offscreen buffer
 
                 CMP     #LinePs+<241.*2>,R4
                 BNE     2$
@@ -41,7 +41,7 @@ ShiftVP::       ;------------------------------------------------------------{{{
                 RETURN
 ;----------------------------------------------------------------------------}}}
 CpLine:         ;------------------------------------------------------------{{{
-                MOVT    40.,(R2)+,(R1)+ ; MOV (R2)+,(R1)+ 40 times
+                MOVT    40.,(R2)+,(R1)+ ; inserts MOV (R2)+,(R1)+ 40 times
                 RETURN
 ;----------------------------------------------------------------------------}}}
 

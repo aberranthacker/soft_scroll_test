@@ -89,7 +89,8 @@ TimerSr:        ;our timer soubroutine --------------------------------------{{{
                 CLR     R5
                 CLR     @#TCounter
                 RTI
-1$:             INC     @#TCounter
+1$:
+                INC     @#TCounter
                 RTI
 
 TCounter:       .Word   0 ; Timer counter
