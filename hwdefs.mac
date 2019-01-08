@@ -14,33 +14,56 @@ CBP12D =: 176642 ;CPU bitplanes 1 and 2 data register
 PBPADR =: 177010 ;PPU bitplanes address register
 PBP0DT =: 177012 ;PPU bitplane 0 data register
 PBP12D =: 177014 ;PPU bitplanes 1 and 2 data register
+DTSCOL =: 177016 ;PPU dots color
+BP01BC =: 177020 ;PPU bitplanes 0/1 background color
+BP12BC =: 177022 ;PPU bitplanes 1/2 background color
+DTSOCT =: 177024 ;PPU dots octet
 PBPMSK =: 177026 ;PPU bitplanes mask register
 
 ; CPU - PPU communication channels
-CCH0IS =: 177560 ;CPU channel 0 in  state register
-CCH0ID =: 177562 ;CPU channel 0 in  data register
-CCH0OS =: 177564 ;CPU channel 0 out state register
-CCH0OD =: 177566 ;CPU channel 0 out data register
+CCH0II =: 60     ;CPU channel 0 in   state interrupt
+CCH0IS =: 177560 ;CPU channel 0 in   state register
+CCH0ID =: 177562 ;CPU channel 0 in   data register
+CCH0OI =: 64     ;CPU channel 0 out  state interrupt
+CCH0OS =: 177564 ;CPU channel 0 out  state register
+CCH0OD =: 177566 ;CPU channel 0 out  data register
      
-CCH1IS =: 176660 ;CPU channel 1 in  state register
-CCH1ID =: 176662 ;CPU channel 1 in  data register
-CCH1OS =: 176664 ;CPU channel 1 out state register
-CCH1OD =: 176666 ;CPU channel 1 out data register
-     
-CCH2OS =: 176674 ;CPU channel 2 out state register
-CCH2OD =: 176676 ;CPU channel 2 out data register
+CCH1II =: 460    ;CPU channel 1 in   state interrupt
+CCH1IS =: 176660 ;CPU channel 1 in   state register
+CCH1ID =: 176662 ;CPU channel 1 in   data register
+CCH1OI =: 464    ;CPU channel 1 out  state interrput
+CCH1OS =: 176664 ;CPU channel 1 out  state register
+CCH1OD =: 176666 ;CPU channel 1 out  data register
 
+CCH2OI =: 474    ;CPU channel 2 out  state interrupt
+CCH2OS =: 176674 ;CPU channel 2 out  state register
+CCH2OD =: 176676 ;CPU channel 2 out  data register
+
+;Programmable timer
+TMRST  =: 177710 ;State register
+TMREVN =: 310    ;External event interrupt
+PGTMRI =: 304    ;Programmable timer interrupt
+TMRBRG =: 177712 ;Buffer register
+TMRCST =: 177714 ;Current state register
+
+RSTINT =: 314    ;RESET on CPU bus interrupt
 ; PPU - CPU communication channels
+PCH0II =: 320    ;PPU channel 0 in  data interrupt
 PCH0ID =: 177060 ;PPU channel 0 in  data register
+PCH1II =: 330    ;PPU channel 1 in  data interrupt
 PCH1ID =: 177062 ;PPU channel 1 in  data register
+PCH2II =: 340    ;PPU channel 2 in  data interrupt
 PCH2ID =: 177064 ;PPU channel 2 in  data register
 PCHSIS =: 177066 ;PPU channels 0, 1, 2 in - state register
      
-PCH0OD =: 177070 ;PPU channel 0 in  - data register
-PCH1OD =: 177072 ;PPU channel 1 in  - data register
-PCHSOS =: 177076 ;PPU channels 0 and 1 out - state register
+PCH0OI =: 324    ;PPU channel 0 out  data interrupt
+PCH0OD =: 177070 ;PPU channel 0 out  data register
+PCH1OI =: 334    ;PPU channel 1 out  data interrupt
+PCH1OD =: 177072 ;PPU channel 1 out  data register
+PCHSOS =: 177076 ;PPU channels 0/1 out - state register
 
 ; PPU: keyboard registers
+KBINT  =: 300
 KBSTAT =: 177700 ;keyboard state register
 KBDATA =: 177702 ;keyboard data register
 

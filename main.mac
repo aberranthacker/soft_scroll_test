@@ -1,24 +1,26 @@
 ; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
                 .Title  SoftScroll
                 .Ident  /V0.01/
-
+                .LIST
                 ;if you'd like the programm to use extended memory, located
                 ;above 160000 define one of the two symbols below
-                SRAM   = 1 ;places screen scroll subroutines above 170000
-                ;PCSRAM = 1 ;use window above 160000 for picture buffer and
+                SRAM   == 1 ;places screen scroll subroutines above 170000
+                ;PCSRAM == 1 ;use window above 160000 for picture buffer and
                            ;window above 170000 for screen scroll subroutines
+                ;SR2SR  == 1 ;
 
                 .Include /HWDEFS.MAC/ ; Hardware registers and some other definitions
                 .Include /PRDEFS.MAC/ ; Project symbols definitions
                 .Include /MACROS.MAC/ ; Macros
-                .IIF DF SRAM,   .Include /SRAM.MM/
-                .IIF DF PCSRAM, .Include /PCSRAM.MM/
+.IIF DF SRAM,   .Include /SRAM.MM/
+.IIF DF PCSRAM, .Include /PCSRAM.MM/
+.IIF DF SR2SR,  .Include /SR2SR.MM/
 
-                .MCall  .Print, .Lookup, .ReadW, .Close, .Exit
+                .MCall  .Addr, .Print, .Lookup, .ReadW, .Close, .Debug, .DPrint, .Exit
 
                 .ASect
                 .=42    ;address of initial stack pointer
-            .IF DF SRAM ! PCSRAM
+            .IF DF SRAM ! PCSRAM ! SR2SR
                 .WORD   175776
             .IFF
                 .WORD  STCKTP + <STCKSZ * 2>
@@ -29,11 +31,11 @@ Start:          ;------------------------------------------------------------{{{
                 ;CALL    FillVP                  ;fill viewport area with a pattern
                 CALL    RdPict                  ;load a picture from file
 
-            .IF DF SRAM
+            .IF DF SRAM ! PCSRAM ! SR2SR
                 CALL    RdSRAM                  ;install subroutines to SRAM
             .ENDC
+
             .IF DF PCSRAM
-                CALL    RdPCSR                  ;install subroutines to SRAM
                 CALL    CPPICT                  ;copy picture to SRAM
             .ENDC
 
@@ -44,16 +46,16 @@ Start:          ;------------------------------------------------------------{{{
                 .WORD   <PPUTEnd-PPUTBeg>/2     ;PPU subroutine size, words
 
                 CALL    FillHF                  ;fill header/footer with a pattern
-            .IF NDF PCSRAM
+            .IF NDF PCSRAM & SR2SR
                 CALL    FillLPs                 ;create screenlines lookup table
                 MOV     #LinePs+<200.*2>,R3     ;last line to copy from
                 MOV     #LinePs+<240.*2>,R4     ;first line to copy to
             .ENDC
 
+                CLR     R5                      ;
                 MOV     @#100,@#SysHand         ;store address of systems timer handler
                 MOV     #TimerSr,@#100          ;and install our handler
 
-                CLR     R5                      ;
 WaitPP:         CALL    ShiftVP
                 INC     R5
                 TST     FlgEnd
@@ -81,20 +83,6 @@ KeyON:          .ASCII  <33><133><62><154><200>
                         ;01234567890123456789012345678901234567890123456789012345678901234567890123456789
 RsltStr:        .ASCIZ  "Result, timer ticks: 123456"
                 .Even
-;----------------------------------------------------------------------------}}}
-TimerSr:        ;our timer soubroutine --------------------------------------{{{
-                CMP     R5,#200.
-                BNE     1$
-                MOV     @#TCounter, @#Result
-                CLR     R5
-                CLR     @#TCounter
-                RTI
-1$:
-                INC     @#TCounter
-                RTI
-
-TCounter:       .Word   0 ; Timer counter
-Result:         .Word   0
 ;----------------------------------------------------------------------------}}}
 ClrHF:          ;------------------------------------------------------------{{{
                 MOV     #<88.*LSW>,R0   ;word to clear
@@ -162,7 +150,7 @@ RdPict::        ;------------------------------------------------------------{{{
 
 REBELS:         .RAD50  /DK REBELSBPS/
 ;----------------------------------------------------------------------------}}}
-PPUTBeg:        ;------------------------------------------------------------{{{
+PPUTBeg::       ;------------------------------------------------------------{{{
 ; screen scanlines metadata: ------------------------------------------------{{{
 ; | 2400 | 175700—176567 | верхняя служебная строка           |
 ; | 2470 | 100000—154537 | основной (главный) экран           |
@@ -173,17 +161,16 @@ PPUTBeg:        ;------------------------------------------------------------{{{
 ; scanlines 1..19 are not visible due to the vertical blanking interval
 ; scanlines 20..307 are visible
 ; scanlines 308..309 are not visible due to the vertical blanking interval
-                MOV     PC,R0           ;
-                ADD     #SLTAB-.,R0     ;calc address of current element of SLTAB
-                ADD     #7,R0           ;
-                BIC     #7,R0           ;align at 8 bytes
-                MOV     R0,R1           ;R0 address of current element (2)
-                ADD     #4,R1           ;R1 address of next element (3)
+                .ADDR   #SLTAB,R0       ;calc address of the SLTAB
+                ADD     #7,R0           ;align at 8 bytes
+                BIC     #7,R0           ;the new SLTAB will be invalid otherwise
+                MOV     R0,R1           ;R0 address of the current element (2)
+                ADD     #4,R1           ;R1 address of the next element (3)
 
                 MOV     #15.,R2         ;elements 2..16 are same
 1$:             CLR     (R0)+           ;--addresses of lines 2..16
                 MOV     R1,(R0)+        ;--pointers to elements 3..17
-                ADD     #4,R1           ;calc address of next element of SLTAB
+                ADD     #4,R1           ;calc address of the next element of SLTAB
                 SOB     R2,1$
 
                 CLR     (R0)+           ;--address of line 17
@@ -234,12 +221,10 @@ PPUTBeg:        ;------------------------------------------------------------{{{
 ;----------------------------------------------------------------------------}}}
                 MTPS    PR7             ;disable interrupts
                 MOV     #1,@#PBPMSK     ;disable writes to bitplane 0 through registers
-                MOV     PC,R0           ;store pointer to the next element of
-                ADD     #SYS272-.,R0    ;scanlines table
-                MOV     @#272,(R0)      ;
-
-                MOV     PC,R0           ;address of current element in SLTAB
-                ADD     #SLTAB-.,R0     ;first element
+                .ADDR   #SYS272,R0      ;calculate address of SYS272
+                MOV     @#272,(R0)      ;store pointer to the next element of
+                                        ;scanlines table
+                .ADDR   #SLTAB,R0       ;calculate address of the SLTAB
                 ADD     #7,R0           ;align at 8 bytes, otherwise
                 BIC     #7,R0           ;for some reason, the new table will not work
                 MOV     R0,@#272        ;--pointer to element 1 in SLTAB
@@ -250,9 +235,8 @@ WaitKey:        TSTB    @#KBSTAT        ;wait for any key state to change
                 TSTB    @#KBDATA        ;loop if a key was pressed off
                 BMI     WaitKey         ;branch if minus
                                         ;--- finish PPU program ---
-                MOV     PC,R0           ;restore pointer to systems
-                ADD     #SYS272-.,R0    ;scanlines table
-                MOV     (R0),@#272      ;
+                .ADDR   #SYS272,R0      ;calculate address of SYS272
+                MOV     (R0),@#272      ;restore pointer to systems scanlines table
                 CLR     @#PBPMSK        ;enable writes to all bitplanes through registers
 
                 MOV     #<FlgEnd/2>,@#PBPADR
@@ -261,12 +245,12 @@ WaitKey:        TSTB    @#KBSTAT        ;wait for any key state to change
 
 SYS272:         .WORD           ;pointer to systems scanlines table
 SLTAB:          .BLKW   600.    ;our scanlines table
-PPUTEnd:
+PPUTEnd::
 ;----------------------------------------------------------------------------}}}
 
-            .IF DF SRAM
+            .IF DF SRAM ! PCSRAM ! SR2SR
 RdSRAM:         ;------------------------------------------------------------{{{
-                .LOOKUP #LkpArea,#0,#SRABIN      ;.LOOKUP area,chan,dblk[,seqnum]
+                .LOOKUP #LkpArea,#0,#FNBIN       ;.LOOKUP area,chan,dblk[,seqnum]
                 BCS     1$
                 .READW  #RdArea,#0,#170000,#SRAMSZ,#0 ;.READW  area,chan,buf,wcnt,blk[,BMODE=strg]
                 BCS     2$
@@ -278,27 +262,15 @@ RdSRAM:         ;------------------------------------------------------------{{{
 2$:             .Print  #RErr
                 .Exit
 
-SRABIN:         .RAD50  /DK SRAM  BIN/
+                .IIF DF SRAM,   FNBIN: .RAD50  /DK SRAM  BIN/
+                .IIF DF PCSRAM, FNBIN: .RAD50  /DK PCSRAMBIN/
+                .IIF DF SR2SR,  FNBIN: .RAD50  /DK SR2SR BIN/
 ;----------------------------------------------------------------------------}}}
             .ENDC
 
             .IF DF PCSRAM
-RdPCSR:         ;------------------------------------------------------------{{{
-                .LOOKUP #LkpArea,#0,#PCSBIN      ;.LOOKUP area,chan,dblk[,seqnum]
-                BCS     1$
-                .READW  #RdArea,#0,#170000,#PCSRSZ,#0 ;.READW  area,chan,buf,wcnt,blk[,BMODE=strg]
-                BCS     2$
-                .Close  #0                       ;.CLOSE  chan
-                RETURN
-
-1$:             .Print  #LErr
-                .Exit
-2$:             .Print  #RErr
-                .Exit
-
-PCSBIN:         .RAD50  /DK PCSRAMBIN/
-;----------------------------------------------------------------------------}}}
 CPPICT:         ;------------------------------------------------------------{{{
+                RETURN
                 CLRB    @#WNDRGA                ;switch to page 0
                 MOV     #BP12,R3
                 MOV     #160000,R4
@@ -322,7 +294,8 @@ CPPICT:         ;------------------------------------------------------------{{{
 ;----------------------------------------------------------------------------}}}
             .ENDC
 
-            .IF NDF SRAM & PCSRAM
+            .IF NDF SRAM & PCSRAM & SR2SR
+                .Include /TMSR.MAC/ ;timer subroutine
 ShiftVP:        ;------------------------------------------------------------{{{
                 MOV     (R4)+,R1
                 MOV     #BP12,R2
@@ -369,7 +342,7 @@ LErr:           .ASCIZ  /File lookup error./
 RErr:           .ASCIZ  /File read error./
                 .Even
 
-            .IF NDF SRAM & PCSRAM
+            .IF NDF SRAM & PCSRAM & SR2SR
 LinePs::        .BLKW   241.
             .ENDC
 

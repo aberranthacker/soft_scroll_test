@@ -18,6 +18,7 @@ fi
 
 printf "\n"
 ruby pluck.rb -i SRAM.SAV -o SRAM.BIN -m SRAM.MAP
+rm SRAM.SAV
 printf "\n"
 #-------------------------------------------------------------------------------
 echo "Compiling PCSRAM.MAC ..."
@@ -30,8 +31,23 @@ fi
 
 printf "\n"
 ruby pluck.rb -i PCSRAM.SAV -o PCSRAM.BIN -m PCSRAM.MAP
+rm PCSRAM.SAV
 printf "\n"
 #-------------------------------------------------------------------------------
+echo "Compiling SR2SR.MAC ..."
+wine cmd.exe /c "$RT11EMU" MACRO SR2SR.MAC+SYSMAC.SML/LIBRARY 2>/dev/null
+echo "Linking SR2SR.OBJ ..."
+wine cmd.exe /c "$RT11EMU" LINK SR2SR /MAP:SR2SR.MAP 2>/dev/null
+if [ -f SR2SR.MAP ]; then
+   cat SR2SR.MAP
+fi
+
+printf "\n"
+ruby pluck.rb -i SR2SR.SAV -o SR2SR.BIN -m SR2SR.MAP
+rm SR2SR.SAV
+printf "\n"
+#-------------------------------------------------------------------------------
+
 echo "Compiling MAIN.MAC ..."
 wine cmd.exe /c "$RT11EMU" MACRO MAIN.MAC+SYSMAC.SML/LIBRARY 2>/dev/null
 echo "Linking MAIN.OBJ ..."
@@ -40,3 +56,6 @@ if [ -f MAIN.MAP ]; then
    cat MAIN.MAP
 fi
 #-------------------------------------------------------------------------------
+rm -f *.LST
+rm -f *.MAP
+rm -f *.OBJ

@@ -1,0 +1,14 @@
+; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
+TimerSr::       ;our timer soubroutine
+                CMP     R5,#200.
+                BNE     1$
+                MOV     @#TCounter, @#Result
+                CLR     R5
+                MOV     R5,@#TCounter
+                RTI
+1$:
+                INC     @#TCounter
+                RTI
+
+TCounter:       .Word   0 ; Timer counter
+Result::        .Word   0
