@@ -8,7 +8,7 @@
                 .=170000
 
 START:
-                .Include /TMSR.MAC/ ;timer subroutine
+                .Include /TMRSR.MAC/ ;timer subroutine
 ShiftVP::       ;------------------------------------------------------------{{{
 ;                MOV     #160000,R3
 ;                MOV     #BP12,R4

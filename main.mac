@@ -1,26 +1,26 @@
 ; vim: set fileformat=dos filetype=asmpdp11 tabstop=8 expandtab shiftwidth=4 autoindent :
                 .Title  SoftScroll
                 .Ident  /V0.01/
-                .LIST
+
                 ;if you'd like the programm to use extended memory, located
                 ;above 160000 define one of the two symbols below
                 SRAM   == 1 ;places screen scroll subroutines above 170000
-                ;PCSRAM == 1 ;use window above 160000 for picture buffer and
+                ;SR2DRM == 1 ;use window above 160000 for picture buffer and
                            ;window above 170000 for screen scroll subroutines
-                ;SR2SR  == 1 ;
+                ;SR2SR  == 1 ;test SRAM to SRAM memcopy speed
 
                 .Include /HWDEFS.MAC/ ; Hardware registers and some other definitions
                 .Include /PRDEFS.MAC/ ; Project symbols definitions
                 .Include /MACROS.MAC/ ; Macros
 .IIF DF SRAM,   .Include /SRAM.MM/
-.IIF DF PCSRAM, .Include /PCSRAM.MM/
+.IIF DF SR2DRM, .Include /SR2DRM.MM/
 .IIF DF SR2SR,  .Include /SR2SR.MM/
 
                 .MCall  .Addr, .Print, .Lookup, .ReadW, .Close, .Debug, .DPrint, .Exit
 
                 .ASect
                 .=42    ;address of initial stack pointer
-            .IF DF SRAM ! PCSRAM ! SR2SR
+            .IF DF SRAM ! SR2DRM ! SR2SR
                 .WORD   175776
             .IFF
                 .WORD  STCKTP + <STCKSZ * 2>
@@ -31,11 +31,11 @@ Start:          ;------------------------------------------------------------{{{
                 ;CALL    FillVP                  ;fill viewport area with a pattern
                 CALL    RdPict                  ;load a picture from file
 
-            .IF DF SRAM ! PCSRAM ! SR2SR
+            .IF DF SRAM ! SR2DRM ! SR2SR
                 CALL    RdSRAM                  ;install subroutines to SRAM
             .ENDC
 
-            .IF DF PCSRAM
+            .IF DF SR2DRM
                 CALL    CPPICT                  ;copy picture to SRAM
             .ENDC
 
@@ -46,7 +46,7 @@ Start:          ;------------------------------------------------------------{{{
                 .WORD   <PPUTEnd-PPUTBeg>/2     ;PPU subroutine size, words
 
                 CALL    FillHF                  ;fill header/footer with a pattern
-            .IF NDF PCSRAM & SR2SR
+            .IF NDF SR2DRM & SR2SR
                 CALL    FillLPs                 ;create screenlines lookup table
                 MOV     #LinePs+<200.*2>,R3     ;last line to copy from
                 MOV     #LinePs+<240.*2>,R4     ;first line to copy to
@@ -248,9 +248,9 @@ SLTAB:          .BLKW   600.    ;our scanlines table
 PPUTEnd::
 ;----------------------------------------------------------------------------}}}
 
-            .IF DF SRAM ! PCSRAM ! SR2SR
+            .IF DF SRAM ! SR2DRM ! SR2SR
 RdSRAM:         ;------------------------------------------------------------{{{
-                .LOOKUP #LkpArea,#0,#FNBIN       ;.LOOKUP area,chan,dblk[,seqnum]
+                .LOOKUP #LkpArea,#0,#FLNBIN      ;.LOOKUP area,chan,dblk[,seqnum]
                 BCS     1$
                 .READW  #RdArea,#0,#170000,#SRAMSZ,#0 ;.READW  area,chan,buf,wcnt,blk[,BMODE=strg]
                 BCS     2$
@@ -262,13 +262,13 @@ RdSRAM:         ;------------------------------------------------------------{{{
 2$:             .Print  #RErr
                 .Exit
 
-                .IIF DF SRAM,   FNBIN: .RAD50  /DK SRAM  BIN/
-                .IIF DF PCSRAM, FNBIN: .RAD50  /DK PCSRAMBIN/
-                .IIF DF SR2SR,  FNBIN: .RAD50  /DK SR2SR BIN/
+                .IIF DF SRAM,   FLNBIN: .RAD50  /DK SRAM  BIN/
+                .IIF DF SR2DRM, FLNBIN: .RAD50  /DK SR2DRMBIN/
+                .IIF DF SR2SR,  FLNBIN: .RAD50  /DK SR2SR BIN/
 ;----------------------------------------------------------------------------}}}
             .ENDC
 
-            .IF DF PCSRAM
+            .IF DF SR2DRM
 CPPICT:         ;------------------------------------------------------------{{{
                 RETURN
                 CLRB    @#WNDRGA                ;switch to page 0
@@ -294,8 +294,8 @@ CPPICT:         ;------------------------------------------------------------{{{
 ;----------------------------------------------------------------------------}}}
             .ENDC
 
-            .IF NDF SRAM & PCSRAM & SR2SR
-                .Include /TMSR.MAC/ ;timer subroutine
+            .IF NDF SRAM & SR2DRM & SR2SR
+                .Include /TMRSR.MAC/ ;timer subroutine
 ShiftVP:        ;------------------------------------------------------------{{{
                 MOV     (R4)+,R1
                 MOV     #BP12,R2
@@ -342,7 +342,7 @@ LErr:           .ASCIZ  /File lookup error./
 RErr:           .ASCIZ  /File read error./
                 .Even
 
-            .IF NDF SRAM & PCSRAM & SR2SR
+            .IF NDF SRAM & SR2DRM & SR2SR
 LinePs::        .BLKW   241.
             .ENDC
 

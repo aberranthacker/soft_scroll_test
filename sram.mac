@@ -8,7 +8,7 @@
                 .=170000
 
 START:
-                .Include /TMSR.MAC/ ;timer subroutine
+                .Include /TMRSR.MAC/ ;timer subroutine
 FillLPs::       ;------------------------------------------------------------{{{
                 MOV     #241.,R0
                 MOV     #BP12,R1

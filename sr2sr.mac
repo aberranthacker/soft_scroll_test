@@ -6,7 +6,7 @@
                 .=170000
 
 START:
-                .Include /TMSR.MAC/ ;timer subroutine
+                .Include /TMRSR.MAC/ ;timer subroutine
 ShiftVP::       ;------------------------------------------------------------{{{
                 MOV     #160002,R2        ;R2 - source
                 MOV     #160004,R1        ;R1 - destination
